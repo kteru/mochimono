@@ -1,0 +1,31 @@
+@import '@mantine/core/styles.css';
+
+:root {
+  --mantine-color-body: #f8f9fa;
+}
+
+body {
+  background: #f8f9fa;
+}
+
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.card-container {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.item-row {
+  background: rgba(248, 249, 250, 0.8);
+  border: 1px solid rgba(233, 236, 239, 0.8);
+  transition: all 0.2s ease;
+}
+
+.item-row:hover {
+  background: rgba(241, 243, 245, 0.9);
+  border-color: rgba(206, 212, 218, 0.9);
+}
