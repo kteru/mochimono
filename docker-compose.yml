@@ -1,0 +1,110 @@
+# =============================================================================
+# Mochimono - Personal Items Memo App Docker Compose Configuration
+# =============================================================================
+#
+# Usage:
+#   1. Set environment variables:
+#      export NEXTAUTH_URL=http://localhost:3000
+#      export NEXTAUTH_SECRET=your-secret-key  
+#      export GOOGLE_CLIENT_ID=your-client-id
+#      export GOOGLE_CLIENT_SECRET=your-client-secret
+#
+#   2. Start in development environment:
+#      docker-compose up -d
+#
+#   3. Start in production environment:
+#      docker-compose --profile production up -d
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # Development and testing configuration
+  mochimono:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mochimono
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NEXTAUTH_URL=${NEXTAUTH_URL:?NEXTAUTH_URL environment variable is not set}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET environment variable is not set}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID environment variable is not set}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET environment variable is not set}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/mochimono.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    profiles:
+      - default
+
+  # Production configuration (using prebuilt image)
+  mochimono-prod:
+    image: mochimono:latest
+    container_name: mochimono-prod
+    ports:
+      - "${MOCHIMONO_PORT:-3000}:3000"
+    volumes:
+      - ${MOCHIMONO_DATA_PATH:-./data}:/app/data
+    environment:
+      - NEXTAUTH_URL=${NEXTAUTH_URL:?NEXTAUTH_URL environment variable is not set}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET environment variable is not set}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID environment variable is not set}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET environment variable is not set}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/mochimono.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    profiles:
+      - production
+
+  # Debug and development configuration
+  mochimono-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Stop at builder stage (includes dev tools)
+    container_name: mochimono-dev
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # For Node.js debugger
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src:ro  # Mount source code (read-only)
+      - ./prisma:/app/prisma:ro
+    environment:
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dev-secret-key}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID environment variable is not set}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET environment variable is not set}
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/mochimono.db}
+      - LOG_LEVEL=DEBUG
+      - NODE_ENV=development
+    command: ["npm", "run", "dev"]
+    profiles:
+      - development
+
+# Named volumes (use as needed)
+volumes:
+  mochimono_data:
+    driver: local
+
+# Network configuration (use as needed)
+networks:
+  default:
+    name: mochimono_network
