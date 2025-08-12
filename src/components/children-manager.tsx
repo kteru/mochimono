@@ -52,6 +52,7 @@ interface SortableChildCardProps {
   onAddItemType: (childId: string, itemType: ItemType) => void
   onReorderItemTypes: (childId: string, itemTypes: ItemType[]) => void
   onUpdateChild: (child: Child) => void
+  feedbackStates: Map<string, 'idle' | 'success' | 'error'>
 }
 
 function SortableChildCard(props: SortableChildCardProps) {
@@ -98,6 +99,12 @@ export function ChildrenManager() {
   // Ref for debouncing
   const debounceTimeouts = useRef<Record<string, NodeJS.Timeout>>({})
 
+  // Feedback state for API success/error
+  const [feedbackStates, setFeedbackStates] = useState<Map<string, 'idle' | 'success' | 'error'>>(new Map())
+  const feedbackTimeouts = useRef<Record<string, NodeJS.Timeout>>({})
+  // Store original quantities before changes for error recovery
+  const originalQuantities = useRef<Record<string, number>>({})
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -105,8 +112,12 @@ export function ChildrenManager() {
   // Clean up timers when component unmounts
   useEffect(() => {
     const timeouts = debounceTimeouts.current
+    const feedbackTimers = feedbackTimeouts.current
     return () => {
       Object.values(timeouts).forEach(timeout => {
+        clearTimeout(timeout)
+      })
+      Object.values(feedbackTimers).forEach(timeout => {
         clearTimeout(timeout)
       })
     }
@@ -165,8 +176,26 @@ export function ChildrenManager() {
     }
   }
 
+  // Helper function to set feedback state and auto-reset after 1 second
+  const setFeedbackState = useCallback((key: string, state: 'success' | 'error') => {
+    setFeedbackStates(prev => new Map(prev).set(key, state))
+    
+    // Clear existing timer for this item
+    if (feedbackTimeouts.current[key]) {
+      clearTimeout(feedbackTimeouts.current[key])
+    }
+    
+    // Reset to idle after 0.5 second
+    feedbackTimeouts.current[key] = setTimeout(() => {
+      setFeedbackStates(prev => new Map(prev).set(key, 'idle'))
+      delete feedbackTimeouts.current[key]
+    }, 500)
+  }, [setFeedbackStates])
+
   // Actual function to call API
-  const updateChildItemAPI = async (childId: string, itemTypeId: string, quantity: number) => {
+  const updateChildItemAPI = useCallback(async (childId: string, itemTypeId: string, quantity: number) => {
+    const key = `${childId}-${itemTypeId}`
+    
     try {
       const res = await fetch('/api/child-items', {
         method: 'PUT',
@@ -177,15 +206,55 @@ export function ChildrenManager() {
       if (res.ok) {
         const updatedItem = await res.json()
         console.log('Quantity updated in database:', { childId, itemTypeId, quantity })
+        // Set success feedback
+        setFeedbackState(key, 'success')
+      } else {
+        throw new Error('API request failed')
       }
     } catch (error) {
       console.error('Error updating child item:', error)
+      // Set error feedback and revert UI state
+      setFeedbackState(key, 'error')
+      
+      // Revert the UI back to original quantity
+      const originalQuantity = originalQuantities.current[key] || 0
+      
+      // Revert UI state
+      setChildren(prev => prev.map(child => {
+        if (child.id === childId) {
+          const existingItemIndex = child.childItems.findIndex(
+            item => item.itemType.id === itemTypeId
+          )
+          
+          if (existingItemIndex >= 0) {
+            const updatedChildItems = [...child.childItems]
+            updatedChildItems[existingItemIndex] = {
+              ...updatedChildItems[existingItemIndex],
+              quantity: originalQuantity
+            }
+            return { ...child, childItems: updatedChildItems }
+          }
+        }
+        return child
+      }))
+      
+      // Clean up original quantity reference
+      delete originalQuantities.current[key]
     }
-  }
+  }, [setFeedbackState, setChildren])
 
   // updateChildItem function with debounce
   const updateChildItem = useCallback((childId: string, itemTypeId: string, quantity: number) => {
     const key = `${childId}-${itemTypeId}`
+    
+    // Store original quantity before making changes (only if not already stored)
+    if (!originalQuantities.current[key]) {
+      const currentChild = children.find(c => c.id === childId)
+      if (currentChild) {
+        const currentItem = currentChild.childItems.find(item => item.itemType.id === itemTypeId)
+        originalQuantities.current[key] = currentItem?.quantity || 0
+      }
+    }
     
     // Update UI immediately
     setChildren(prev => prev.map(child => {
@@ -226,8 +295,10 @@ export function ChildrenManager() {
     debounceTimeouts.current[key] = setTimeout(() => {
       updateChildItemAPI(childId, itemTypeId, quantity)
       delete debounceTimeouts.current[key]
+      // Clean up original quantity on successful API call timing
+      delete originalQuantities.current[key]
     }, 1000)
-  }, [])
+  }, [children, updateChildItemAPI])
 
   const deleteItemType = async (childId: string, itemTypeId: string) => {
     try {
@@ -336,6 +407,7 @@ export function ChildrenManager() {
               onAddItemType={addItemType}
               onReorderItemTypes={reorderItemTypes}
               onUpdateChild={updateChild}
+              feedbackStates={feedbackStates}
             />
           ))}
         </SortableContext>

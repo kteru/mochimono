@@ -56,6 +56,7 @@ interface ChildCardProps {
   onAddItemType: (childId: string, itemType: ItemType) => void
   onReorderItemTypes: (childId: string, itemTypes: ItemType[]) => void
   onUpdateChild: (child: Child) => void
+  feedbackStates: Map<string, 'idle' | 'success' | 'error'>
 }
 
 interface SortableItemProps {
@@ -66,6 +67,7 @@ interface SortableItemProps {
   onUpdateChildItem: (childId: string, itemTypeId: string, quantity: number) => void
   onDeleteItemType: (itemType: ItemType) => void
   onUpdateItemType: (itemType: ItemType) => void
+  feedbackState: 'idle' | 'success' | 'error'
 }
 
 function SortableItem({ 
@@ -75,7 +77,8 @@ function SortableItem({
   editMode,
   onUpdateChildItem, 
   onDeleteItemType,
-  onUpdateItemType
+  onUpdateItemType,
+  feedbackState
 }: SortableItemProps) {
   const [isEditingItemName, setIsEditingItemName] = useState(false)
   const [tempItemName, setTempItemName] = useState(itemType.name)
@@ -88,10 +91,23 @@ function SortableItem({
     isDragging,
   } = useSortable({ id: itemType.id })
 
+  // Get border color based on feedback state
+  const getBorderColor = (state: 'idle' | 'success' | 'error') => {
+    switch (state) {
+      case 'success':
+        return 'var(--mantine-color-green-5)'
+      case 'error':
+        return 'var(--mantine-color-red-5)'
+      default:
+        return 'rgba(233, 236, 239, 0.8)'
+    }
+  }
+
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: `${transition}, border-color 150ms ease-in-out`,
     opacity: isDragging ? 0.5 : 1,
+    borderColor: getBorderColor(feedbackState),
   }
 
   const handleSaveItemName = async () => {
@@ -252,6 +268,7 @@ export function ChildCard({
   onAddItemType,
   onReorderItemTypes,
   onUpdateChild,
+  feedbackStates,
 }: ChildCardProps) {
   const [newItemName, setNewItemName] = useState('')
   const [isAddingItem, setIsAddingItem] = useState(false)
@@ -286,7 +303,6 @@ export function ChildCard({
       if (res.ok) {
         const itemType = await res.json()
         onAddItemType(child.id, itemType)
-        onUpdateChildItem(child.id, itemType.id, 0)
         setNewItemName('')
         closeAddItem()
       }
@@ -492,6 +508,8 @@ export function ChildCard({
               >
                 {child.itemTypes.map(itemType => {
                   const quantity = getItemQuantity(itemType.id)
+                  const feedbackKey = `${child.id}-${itemType.id}`
+                  const feedbackState = feedbackStates.get(feedbackKey) || 'idle'
                   return (
                     <SortableItem
                       key={itemType.id}
@@ -502,6 +520,7 @@ export function ChildCard({
                       onUpdateChildItem={onUpdateChildItem}
                       onDeleteItemType={handleDeleteItemType}
                       onUpdateItemType={handleUpdateItemType}
+                      feedbackState={feedbackState}
                     />
                   )
                 })}
