@@ -208,6 +208,8 @@ export function ChildrenManager() {
         console.log('Quantity updated in database:', { childId, itemTypeId, quantity })
         // Set success feedback
         setFeedbackState(key, 'success')
+        // Clean up original quantity on successful API call
+        delete originalQuantities.current[key]
       } else {
         throw new Error('API request failed')
       }
@@ -247,12 +249,15 @@ export function ChildrenManager() {
   const updateChildItem = useCallback((childId: string, itemTypeId: string, quantity: number) => {
     const key = `${childId}-${itemTypeId}`
     
-    // Store original quantity before making changes (only if not already stored)
-    if (!originalQuantities.current[key]) {
-      const currentChild = children.find(c => c.id === childId)
-      if (currentChild) {
-        const currentItem = currentChild.childItems.find(item => item.itemType.id === itemTypeId)
-        originalQuantities.current[key] = currentItem?.quantity || 0
+    // Always store original quantity before making changes
+    const currentChild = children.find(c => c.id === childId)
+    if (currentChild) {
+      const currentItem = currentChild.childItems.find(item => item.itemType.id === itemTypeId)
+      const currentQuantity = currentItem?.quantity || 0
+      
+      // Only store if this is the first change or if there's no pending API call
+      if (!originalQuantities.current[key] || !debounceTimeouts.current[key]) {
+        originalQuantities.current[key] = currentQuantity
       }
     }
     
@@ -295,8 +300,6 @@ export function ChildrenManager() {
     debounceTimeouts.current[key] = setTimeout(() => {
       updateChildItemAPI(childId, itemTypeId, quantity)
       delete debounceTimeouts.current[key]
-      // Clean up original quantity on successful API call timing
-      delete originalQuantities.current[key]
     }, 1000)
   }, [children, updateChildItemAPI])
 
