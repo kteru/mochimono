@@ -220,11 +220,12 @@ function SortableItem({
           <Group gap="4px" align="center">
             <ActionIcon
               variant="outline"
-              size="sm"
               radius="xl"
               color="blue"
               onClick={() => onUpdateChildItem(childId, itemType.id, quantity - 1)}
               disabled={quantity <= 0}
+              w={28}
+              h={28}
             >
               <IconMinus size={14} />
             </ActionIcon>
@@ -244,10 +245,11 @@ function SortableItem({
             
             <ActionIcon
               variant="outline"
-              size="sm"
               radius="xl"
               color="blue"
               onClick={() => onUpdateChildItem(childId, itemType.id, quantity + 1)}
+              w={28}
+              h={28}
             >
               <IconPlus size={14} />
             </ActionIcon>
