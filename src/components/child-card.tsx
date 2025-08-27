@@ -280,7 +280,12 @@ export function ChildCard({
   const [tempChildName, setTempChildName] = useState(child.name)
   
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+        delay: 200,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
