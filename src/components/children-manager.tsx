@@ -90,7 +90,12 @@ export function ChildrenManager() {
   const [opened, { open, close }] = useDisclosure(false)
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+        delay: 200,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
